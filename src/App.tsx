@@ -1,94 +1,69 @@
-import { useState, useEffect } from 'react'
+import { AuthProvider, useAuth } from './auth/AuthContext'
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { supabase } from './supabaseClient'
 import './App.css'
-import AuthComponent from './Auth'
-import { Session } from '@supabase/supabase-js'
 
-function App() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [personalCount, setPersonalCount] = useState(0)
+function AuthenticatedApp() {
+  const { userProfile, signOut } = useAuth()
 
-  useEffect(() => {
-    // Get session on initial load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-
-    // Subscribe to auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  // Load the personal counter from the database once user is signed in
-  useEffect(() => {
-    async function fetchPersonalCount() {
-      if (session?.user) {
-        const { data, error } = await supabase
-          .from('personal_counts')
-          .select('value')
-          .eq('user_id', session.user.id)
-          .single()
-
-        if (data && data.value !== undefined) {
-          setPersonalCount(data.value)
-        } else if (!data) {
-          // If there's no row yet, create it
-          const { error: insertError } = await supabase
-            .from('personal_counts')
-            .insert([{ user_id: session.user.id, value: 0 }])
-
-          if (!insertError) {
-            setPersonalCount(0)
-          }
-        }
-        if (error) console.error(error)
-      }
-    }
-
-    fetchPersonalCount()
-  }, [session])
-
-  // Update the personal counter in the database
-  async function updatePersonalCount(newValue: number) {
-    setPersonalCount(newValue)
-    if (session?.user) {
-      const { error } = await supabase
-        .from('personal_counts')
-        .upsert({ user_id: session.user.id, value: newValue })
-
-      if (error) {
-        console.error(error)
-      }
-    }
-  }
+  if (!userProfile) return null
 
   return (
-    <>
-      <AuthComponent />
-
-      {session?.user ? (
-        <div style={{ marginTop: '1rem' }}>
-          <h2>Personal Counter</h2>
-          <button onClick={() => updatePersonalCount(personalCount - 1)}>
-            -
-          </button>
-          <span style={{ margin: '0 1rem' }}>
-            {personalCount}
-          </span>
-          <button onClick={() => updatePersonalCount(personalCount + 1)}>
-            +
-          </button>
+    <div className="app-container">
+      <header>
+        <h1>GauntletCRM</h1>
+        <div className="user-info">
+          <span>{userProfile.full_name} ({userProfile.role})</span>
+          <button onClick={signOut}>Sign Out</button>
         </div>
-      ) : (
-        <p>Please sign in to see your personal counter.</p>
-      )}
-    </>
+      </header>
+      
+      <main>
+        {userProfile.role === 'customer' && (
+          <div>Customer Dashboard (Coming Soon)</div>
+        )}
+        {userProfile.role === 'agent' && (
+          <div>Agent Dashboard (Coming Soon)</div>
+        )}
+        {userProfile.role === 'admin' && (
+          <div>Admin Dashboard (Coming Soon)</div>
+        )}
+      </main>
+    </div>
   )
 }
 
-export default App
+function UnauthenticatedApp() {
+  return (
+    <div className="auth-container">
+      <h1>Welcome to GauntletCRM</h1>
+      <Auth
+        supabaseClient={supabase}
+        appearance={{ theme: ThemeSupa }}
+        providers={['google', 'github']}
+        redirectTo={window.location.origin}
+      />
+    </div>
+  )
+}
+
+function App() {
+  const { session, loading } = useAuth()
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  return session ? <AuthenticatedApp /> : <UnauthenticatedApp />
+}
+
+function AppWithProviders() {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  )
+}
+
+export default AppWithProviders
