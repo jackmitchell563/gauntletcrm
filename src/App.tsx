@@ -2,6 +2,9 @@ import { AuthProvider, useAuth } from './auth/AuthContext'
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { supabase } from './supabaseClient'
+import { TicketList } from './tickets/TicketList'
+import { TicketForm } from './tickets/TicketForm'
+import { Stack, Tabs } from '@mantine/core'
 import './App.css'
 
 function AuthenticatedApp() {
@@ -21,13 +24,26 @@ function AuthenticatedApp() {
       
       <main>
         {userProfile.role === 'customer' && (
-          <div>Customer Dashboard (Coming Soon)</div>
+          <Stack gap="lg">
+            <TicketForm />
+            <TicketList />
+          </Stack>
         )}
-        {userProfile.role === 'agent' && (
-          <div>Agent Dashboard (Coming Soon)</div>
-        )}
-        {userProfile.role === 'admin' && (
-          <div>Admin Dashboard (Coming Soon)</div>
+        {(userProfile.role === 'agent' || userProfile.role === 'admin') && (
+          <Tabs defaultValue="tickets">
+            <Tabs.List>
+              <Tabs.Tab value="tickets">Tickets</Tabs.Tab>
+              <Tabs.Tab value="create">Create Ticket</Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="tickets" pt="md">
+              <TicketList />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="create" pt="md">
+              <TicketForm />
+            </Tabs.Panel>
+          </Tabs>
         )}
       </main>
     </div>
