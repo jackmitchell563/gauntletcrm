@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -13,54 +17,48 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+@layer base {
+  body {
+    @apply m-0 flex min-h-screen min-w-[320px] place-items-center;
+  }
+
+  h1 {
+    @apply text-3xl leading-tight;
+  }
+
+  button {
+    @apply rounded-lg border border-transparent bg-[#1a1a1a] px-5 py-2.5 text-base font-medium 
+           transition-colors duration-200 hover:border-[#646cff] focus:outline-none 
+           focus-visible:outline-4 focus-visible:outline-offset-2;
+  }
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
+@layer components {
+  .app-container {
+    @apply mx-auto max-w-7xl p-8;
+  }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
+  .auth-container {
+    @apply mx-auto my-8 max-w-md rounded-lg bg-white p-8 shadow-sm;
+  }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  header {
+    @apply mb-8 flex items-center justify-between border-b border-gray-200 pb-4;
+  }
+
+  .user-info {
+    @apply flex items-center gap-4;
+  }
+
+  main {
+    @apply rounded-lg bg-white p-8 shadow-sm;
+  }
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
     background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
   }
   button {
     background-color: #f9f9f9;
