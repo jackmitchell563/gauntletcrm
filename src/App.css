@@ -1,8 +1,11 @@
 #root {
-  max-width: 1280px;
+  width: 100%;
+  min-height: 100vh;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  text-align: left;
 }
 
 .logo {
@@ -42,17 +45,22 @@
 }
 
 .app-container {
-  max-width: 1280px;
+  max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 header {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-  padding-bottom: 1rem;
+  padding: 1rem 0;
   border-bottom: 1px solid #eaeaea;
 }
 
@@ -86,8 +94,59 @@ button:hover {
 }
 
 main {
+  flex: 1;
+  width: 100%;
   padding: 2rem;
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.ticket-table {
+  font-size: 0.875rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Table styles */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 800px; /* Ensures table doesn't get too squished */
+}
+
+th, td {
+  padding: 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+td {
+  border-top: 1px solid #eaeaea;
+}
+
+/* Ensure content cells have minimum width but also maximum width */
+td:nth-child(1) { min-width: 150px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; } /* Title */
+td:nth-child(2) { min-width: 80px; max-width: 100px; } /* Status */
+td:nth-child(3) { min-width: 80px; max-width: 100px; } /* Priority */
+td:nth-child(4) { min-width: 120px; max-width: 160px; } /* Created */
+td:nth-child(5) { min-width: 120px; max-width: 160px; } /* Updated */
+td:nth-child(6) { min-width: 250px; overflow: visible; white-space: nowrap; } /* Actions */
+td:nth-child(7) { min-width: 100px; max-width: 150px; } /* Tags */
+
+/* Make table cells more compact on smaller screens */
+@media (max-width: 1200px) {
+  th, td {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
 }

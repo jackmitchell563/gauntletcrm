@@ -5,16 +5,20 @@ import { supabase } from '../supabaseClient'
 import { Ticket, TicketStatus } from '../types/database.types'
 import { StatusBadge } from '../components/StatusBadge'
 import { PriorityBadge } from '../components/PriorityBadge'
-import { TicketActions } from './TicketActions'
+import { TagBadge } from '../components/TagBadge'
 
 interface SortState {
   column: keyof Ticket | null
   direction: 'asc' | 'desc'
 }
 
+interface TicketWithTags extends Ticket {
+  ticket_tags: { tag: string }[]
+}
+
 export function TicketList() {
   const { user, userProfile } = useAuth()
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [tickets, setTickets] = useState<TicketWithTags[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -26,11 +30,12 @@ export function TicketList() {
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
+    if (!user || !userProfile) return
     fetchTickets()
-  }, [user, page, sort, statusFilter, searchQuery])
+  }, [user, userProfile, page, sort, statusFilter, searchQuery])
 
   const fetchTickets = async () => {
-    if (!user) return
+    if (!user || !userProfile) return
 
     setLoading(true)
     setError(null)
@@ -38,12 +43,17 @@ export function TicketList() {
     try {
       let query = supabase
         .from('tickets')
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          ticket_tags (
+            tag
+          )
+        `, { count: 'exact' })
 
       // Apply role-based filters
-      if (userProfile?.role === 'customer') {
+      if (userProfile.role === 'customer') {
         query = query.eq('created_by', user.id)
-      } else if (userProfile?.role === 'agent') {
+      } else if (userProfile.role === 'agent') {
         query = query.or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)
       }
 
@@ -96,84 +106,129 @@ export function TicketList() {
     })
   }
 
+  const statusOptions = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'open', label: 'Open' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'closed', label: 'Closed' }
+  ]
+
   if (error) {
     return <Text c="red">{error}</Text>
   }
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between">
+    <Stack gap="xl">
+      <Group justify="space-between" p="md">
         <TextInput
           placeholder="Search tickets..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          w={300}
+          w={400}
+          size="md"
         />
         <Select
           value={statusFilter}
           onChange={(value) => setStatusFilter(value as TicketStatus | 'all')}
-          data={[
-            { value: 'all', label: 'All Statuses' },
-            { value: 'open', label: 'Open' },
-            { value: 'in_progress', label: 'In Progress' },
-            { value: 'resolved', label: 'Resolved' },
-            { value: 'closed', label: 'Closed' }
-          ]}
-          w={200}
+          data={statusOptions}
+          w={250}
+          size="md"
         />
       </Group>
 
-      <Table striped highlightOnHover>
+      <Table 
+        striped 
+        highlightOnHover 
+        horizontalSpacing="xl" 
+        verticalSpacing="md"
+        className="ticket-table"
+      >
         <thead>
           <tr>
-            <th style={{ cursor: 'pointer' }} onClick={() => handleSort('title')}>
+            <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('title')}>
               Title {sort.column === 'title' && (sort.direction === 'asc' ? '↑' : '↓')}
             </th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
+            <th style={{ whiteSpace: 'nowrap' }}>Status</th>
+            <th style={{ whiteSpace: 'nowrap' }}>Priority</th>
+            <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('created_at')}>
               Created {sort.column === 'created_at' && (sort.direction === 'asc' ? '↑' : '↓')}
             </th>
-            <th style={{ cursor: 'pointer' }} onClick={() => handleSort('updated_at')}>
+            <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('updated_at')}>
               Updated {sort.column === 'updated_at' && (sort.direction === 'asc' ? '↑' : '↓')}
             </th>
-            <th>Actions</th>
+            <th style={{ whiteSpace: 'nowrap' }}>Tags</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
             <tr>
               <td colSpan={6}>
-                <Text ta="center">Loading...</Text>
+                <Text ta="center" p="xl">Loading...</Text>
               </td>
             </tr>
           ) : tickets.length === 0 ? (
             <tr>
               <td colSpan={6}>
-                <Text ta="center">No tickets found</Text>
+                <Text ta="center" p="xl">No tickets found</Text>
               </td>
             </tr>
           ) : (
             tickets.map((ticket) => (
-              <tr key={ticket.id} style={{ cursor: 'pointer' }}>
-                <td>{ticket.title}</td>
-                <td><StatusBadge status={ticket.status} /></td>
-                <td><PriorityBadge priority={ticket.priority} /></td>
+              <tr key={ticket.id}>
+                <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {ticket.title}
+                </td>
+                <td>
+                  <StatusBadge 
+                    status={ticket.status} 
+                    onUpdate={async (status) => {
+                      try {
+                        const { error } = await supabase
+                          .from('tickets')
+                          .update({ status })
+                          .eq('id', ticket.id)
+                        if (error) throw error
+                        fetchTickets()
+                      } catch (err) {
+                        console.error('Failed to update ticket:', err)
+                      }
+                    }} 
+                  />
+                </td>
+                <td>
+                  <PriorityBadge 
+                    priority={ticket.priority} 
+                    onUpdate={async (priority) => {
+                      try {
+                        const { error } = await supabase
+                          .from('tickets')
+                          .update({ priority })
+                          .eq('id', ticket.id)
+                        if (error) throw error
+                        fetchTickets()
+                      } catch (err) {
+                        console.error('Failed to update ticket:', err)
+                      }
+                    }}
+                  />
+                </td>
                 <td>{formatDate(ticket.created_at)}</td>
                 <td>{formatDate(ticket.updated_at)}</td>
-                <td><TicketActions ticket={ticket} onUpdate={fetchTickets} /></td>
+                <td><TagBadge tags={ticket.ticket_tags.map(t => t.tag)} /></td>
               </tr>
             ))
           )}
         </tbody>
       </Table>
 
-      <Group justify="center">
+      <Group justify="center" p="md">
         <Pagination
           total={totalPages}
           value={page}
           onChange={setPage}
           withEdges
+          size="md"
         />
       </Group>
     </Stack>

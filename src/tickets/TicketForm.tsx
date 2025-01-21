@@ -4,7 +4,7 @@ import { TextInput, Textarea, Select, Button, Box, Group, Text } from '@mantine/
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../auth/AuthContext'
 import { TicketPriority } from '../types/database.types'
-import { PriorityBadge } from '../components/PriorityBadge'
+// import { PriorityBadge } from '../components/PriorityBadge'
 
 interface TicketFormValues {
   title: string
@@ -13,11 +13,11 @@ interface TicketFormValues {
   tags: string
 }
 
-interface SelectItemProps extends React.ComponentPropsWithoutRef<'div'> {
-  value: string
-  label: string
-  group: string
-}
+// interface SelectItemProps extends React.ComponentPropsWithoutRef<'div'> {
+//   value: string
+//   label: string
+//   group: string
+// }
 
 export function TicketForm() {
   const { user } = useAuth()
@@ -44,13 +44,6 @@ export function TicketForm() {
     }
   })
 
-  const SelectItem = ({ value, label }: SelectItemProps) => (
-    <Group>
-      <PriorityBadge priority={value as TicketPriority} />
-      <Text>{label}</Text>
-    </Group>
-  )
-
   const handleSubmit = async (values: TicketFormValues) => {
     if (!user) return
 
@@ -59,8 +52,8 @@ export function TicketForm() {
     setSuccess(false)
 
     try {
-      // Create the ticket
-      const { data: ticket, error: ticketError } = await supabase
+      // Create the ticket first, without selecting it back
+      const { error: ticketError } = await supabase
         .from('tickets')
         .insert([{
           title: values.title,
@@ -69,24 +62,41 @@ export function TicketForm() {
           created_by: user.id,
           status: 'open'
         }])
-        .select()
-        .single()
 
       if (ticketError) throw ticketError
 
-      // Add tags if provided
-      if (values.tags && ticket) {
+      // Don't try to add tags if there was an error with the ticket
+      // or if no tags were provided
+      if (values.tags) {
+        // Get the newly created ticket
+        const { data: tickets, error: fetchError } = await supabase
+          .from('tickets')
+          .select('id')
+          .eq('created_by', user.id)
+          .eq('title', values.title)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (fetchError) throw fetchError
+        if (!tickets || tickets.length === 0) throw new Error('Failed to retrieve ticket')
+
+        const ticket = tickets[0]
         const tags = values.tags.split(',').map(tag => tag.trim())
-        const tagInserts = tags.map(tag => ({
-          ticket_id: ticket.id,
-          tag
-        }))
+        
+        // Only try to insert tags if we have a valid ticket
+        if (tags.length > 0) {
+          const { error: tagError } = await supabase
+            .from('ticket_tags')
+            .insert(tags.map(tag => ({
+              ticket_id: ticket.id,
+              tag
+            })))
 
-        const { error: tagError } = await supabase
-          .from('ticket_tags')
-          .insert(tagInserts)
-
-        if (tagError) throw tagError
+          // Log tag error but don't fail the whole operation
+          if (tagError) {
+            console.error('Failed to add tags:', tagError)
+          }
+        }
       }
 
       setSuccess(true)
@@ -121,12 +131,11 @@ export function TicketForm() {
         <Select
           label="Priority"
           data={[
-            { value: 'low', label: 'Low', group: 'Priority' },
-            { value: 'medium', label: 'Medium', group: 'Priority' },
-            { value: 'high', label: 'High', group: 'Priority' },
-            { value: 'urgent', label: 'Urgent', group: 'Priority' }
+            { value: 'low', label: 'Low Priority' },
+            { value: 'medium', label: 'Medium Priority' },
+            { value: 'high', label: 'High Priority' },
+            { value: 'urgent', label: 'Urgent Priority' }
           ]}
-          component={SelectItem}
           {...form.getInputProps('priority')}
           mb="md"
         />

@@ -5,46 +5,60 @@ import { supabase } from './supabaseClient'
 import { TicketList } from './tickets/TicketList'
 import { TicketForm } from './tickets/TicketForm'
 import { Stack, Tabs } from '@mantine/core'
+import { MantineProvider, createTheme } from '@mantine/core'
+import '@mantine/core/styles.css'
 import './App.css'
+
+const theme = createTheme({
+  /** Put theme override here */
+})
 
 function AuthenticatedApp() {
   const { userProfile, signOut } = useAuth()
 
-  if (!userProfile) return null
+  console.log('AuthenticatedApp render:', { userProfile })
+
+  if (!userProfile) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        Loading profile...
+      </div>
+    )
+  }
 
   return (
     <div className="app-container">
       <header>
-        <h1>GauntletCRM</h1>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>GauntletCRM</h1>
         <div className="user-info">
-          <span>{userProfile.full_name} ({userProfile.role})</span>
+          <span style={{ fontSize: '0.9rem' }}>{userProfile.full_name} ({userProfile.role})</span>
           <button onClick={signOut}>Sign Out</button>
         </div>
       </header>
       
       <main>
-        {userProfile.role === 'customer' && (
-          <Stack gap="lg">
-            <TicketForm />
-            <TicketList />
-          </Stack>
-        )}
-        {(userProfile.role === 'agent' || userProfile.role === 'admin') && (
-          <Tabs defaultValue="tickets">
+        <Stack gap="md">
+          <Tabs defaultValue="tickets" style={{ width: '100%' }}>
             <Tabs.List>
-              <Tabs.Tab value="tickets">Tickets</Tabs.Tab>
-              <Tabs.Tab value="create">Create Ticket</Tabs.Tab>
+              <Tabs.Tab value="tickets" style={{ fontSize: '1rem', padding: '0.75rem 1.5rem' }}>
+                Tickets
+              </Tabs.Tab>
+              {(userProfile.role === 'customer' || userProfile.role === 'agent' || userProfile.role === 'admin') && (
+                <Tabs.Tab value="new-ticket" style={{ fontSize: '1rem', padding: '0.75rem 1.5rem' }}>
+                  New Ticket
+                </Tabs.Tab>
+              )}
             </Tabs.List>
 
-            <Tabs.Panel value="tickets" pt="md">
+            <Tabs.Panel value="tickets" pt="xl">
               <TicketList />
             </Tabs.Panel>
 
-            <Tabs.Panel value="create" pt="md">
+            <Tabs.Panel value="new-ticket" pt="xl">
               <TicketForm />
             </Tabs.Panel>
           </Tabs>
-        )}
+        </Stack>
       </main>
     </div>
   )
@@ -65,20 +79,39 @@ function UnauthenticatedApp() {
 }
 
 function App() {
-  const { session, loading } = useAuth()
+  const { session, loading, userProfile } = useAuth()
+  console.log('App render:', { session, loading, userProfile })
 
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div>Loading...</div>
+      </div>
+    )
   }
 
-  return session ? <AuthenticatedApp /> : <UnauthenticatedApp />
+  if (!session) {
+    return <UnauthenticatedApp />
+  }
+
+  if (!userProfile) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div>Setting up your account...</div>
+      </div>
+    )
+  }
+
+  return <AuthenticatedApp />
 }
 
 function AppWithProviders() {
   return (
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <MantineProvider defaultColorScheme="light" theme={theme}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </MantineProvider>
   )
 }
 
