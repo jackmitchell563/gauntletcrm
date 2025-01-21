@@ -6,6 +6,7 @@ import { Ticket, TicketStatus } from '../types/database.types'
 import { StatusBadge } from '../components/StatusBadge'
 import { PriorityBadge } from '../components/PriorityBadge'
 import { TagBadge } from '../components/TagBadge'
+import { TicketThread } from './TicketThread'
 
 interface SortState {
   column: keyof Ticket | null
@@ -26,6 +27,7 @@ export function TicketList() {
   const [sort, setSort] = useState<SortState>({ column: 'created_at', direction: 'desc' })
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedTicket, setSelectedTicket] = useState<TicketWithTags | null>(null)
 
   const ITEMS_PER_PAGE = 10
 
@@ -118,6 +120,16 @@ export function TicketList() {
     return <Text c="red">{error}</Text>
   }
 
+  if (selectedTicket) {
+    return (
+      <TicketThread 
+        ticketId={selectedTicket.id}
+        ticket={selectedTicket}
+        onBack={() => setSelectedTicket(null)}
+      />
+    )
+  }
+
   return (
     <Stack gap="xl">
       <Group justify="space-between" p="md">
@@ -175,43 +187,51 @@ export function TicketList() {
             </tr>
           ) : (
             tickets.map((ticket) => (
-              <tr key={ticket.id}>
+              <tr 
+                key={ticket.id} 
+                onClick={() => setSelectedTicket(ticket)}
+                style={{ cursor: 'pointer' }}
+              >
                 <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {ticket.title}
                 </td>
                 <td>
-                  <StatusBadge 
-                    status={ticket.status} 
-                    onUpdate={async (status) => {
-                      try {
-                        const { error } = await supabase
-                          .from('tickets')
-                          .update({ status })
-                          .eq('id', ticket.id)
-                        if (error) throw error
-                        fetchTickets()
-                      } catch (err) {
-                        console.error('Failed to update ticket:', err)
-                      }
-                    }} 
-                  />
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block', borderRadius: '4px' }}>
+                    <StatusBadge 
+                      status={ticket.status} 
+                      onUpdate={async (status) => {
+                        try {
+                          const { error } = await supabase
+                            .from('tickets')
+                            .update({ status })
+                            .eq('id', ticket.id)
+                          if (error) throw error
+                          fetchTickets()
+                        } catch (err) {
+                          console.error('Failed to update ticket:', err)
+                        }
+                      }}
+                    />
+                  </div>
                 </td>
                 <td>
-                  <PriorityBadge 
-                    priority={ticket.priority} 
-                    onUpdate={async (priority) => {
-                      try {
-                        const { error } = await supabase
-                          .from('tickets')
-                          .update({ priority })
-                          .eq('id', ticket.id)
-                        if (error) throw error
-                        fetchTickets()
-                      } catch (err) {
-                        console.error('Failed to update ticket:', err)
-                      }
-                    }}
-                  />
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block', borderRadius: '4px' }}>
+                    <PriorityBadge 
+                      priority={ticket.priority} 
+                      onUpdate={async (priority) => {
+                        try {
+                          const { error } = await supabase
+                            .from('tickets')
+                            .update({ priority })
+                            .eq('id', ticket.id)
+                          if (error) throw error
+                          fetchTickets()
+                        } catch (err) {
+                          console.error('Failed to update ticket:', err)
+                        }
+                      }}
+                    />
+                  </div>
                 </td>
                 <td>{formatDate(ticket.created_at)}</td>
                 <td>{formatDate(ticket.updated_at)}</td>

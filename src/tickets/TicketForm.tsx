@@ -58,7 +58,7 @@ export function TicketForm() {
         .insert([{
           title: values.title,
           description: values.description,
-          priority: values.priority,
+          priority: values.priority || 'medium',
           created_by: user.id,
           status: 'open'
         }])
