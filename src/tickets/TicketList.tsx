@@ -34,6 +34,42 @@ export function TicketList() {
   useEffect(() => {
     if (!user || !userProfile) return
     fetchTickets()
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('tickets-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets',
+        },
+        async (payload) => {
+          // For INSERT events, check if the user should have access
+          if (payload.eventType === 'INSERT') {
+            const newTicket = payload.new as Ticket
+            const shouldRefresh = await checkTicketAccess(newTicket)
+            if (shouldRefresh) {
+              fetchTickets()
+            }
+          }
+          // For UPDATE events, check if the user has access to the ticket
+          else if (payload.eventType === 'UPDATE') {
+            const updatedTicket = payload.new as Ticket
+            const shouldRefresh = await checkTicketAccess(updatedTicket)
+            if (shouldRefresh) {
+              fetchTickets()
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription
+    return () => {
+      channel.unsubscribe()
+    }
   }, [user, userProfile, page, sort, statusFilter, searchQuery])
 
   const fetchTickets = async () => {
@@ -47,7 +83,7 @@ export function TicketList() {
         .from('tickets')
         .select(`
           *,
-          ticket_tags (
+          ticket_tags!inner (
             tag
           )
         `, { count: 'exact' })
@@ -82,9 +118,16 @@ export function TicketList() {
 
       if (fetchError) throw fetchError
 
-      setTickets(data || [])
+      // Transform the data to ensure ticket_tags is always an array
+      const transformedData = (data || []).map(ticket => ({
+        ...ticket,
+        ticket_tags: Array.isArray(ticket.ticket_tags) ? ticket.ticket_tags : []
+      }))
+
+      setTickets(transformedData)
       setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE))
     } catch (err) {
+      console.error('Error fetching tickets:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch tickets')
     } finally {
       setLoading(false)
@@ -115,6 +158,26 @@ export function TicketList() {
     { value: 'resolved', label: 'Resolved' },
     { value: 'closed', label: 'Closed' }
   ]
+
+  // Helper function to check if user has access to a ticket
+  const checkTicketAccess = async (ticket: Ticket): Promise<boolean> => {
+    if (!user || !userProfile) return false
+
+    // Admins have access to all tickets
+    if (userProfile.role === 'admin') return true
+
+    // Customers only have access to their own tickets
+    if (userProfile.role === 'customer') {
+      return ticket.created_by === user.id
+    }
+
+    // Agents have access to tickets they created or are assigned to
+    if (userProfile.role === 'agent') {
+      return ticket.created_by === user.id || ticket.assigned_to === user.id
+    }
+
+    return false
+  }
 
   if (error) {
     return <Text c="red">{error}</Text>
