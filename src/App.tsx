@@ -4,8 +4,10 @@ import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { supabase } from './supabaseClient'
 import { TicketList } from './tickets/TicketList'
 import { TicketForm } from './tickets/TicketForm'
-import { Stack, Tabs } from '@mantine/core'
+import { Stack, Tabs, Button } from '@mantine/core'
 import { MantineProvider, createTheme } from '@mantine/core'
+import { HomePage } from './pages/HomePage'
+import { useState } from 'react'
 import '@mantine/core/styles.css'
 import './App.css'
 
@@ -80,6 +82,7 @@ function UnauthenticatedApp() {
 
 function App() {
   const { session, loading, userProfile } = useAuth()
+  const [showLogin, setShowLogin] = useState(false)
   console.log('App render:', { session, loading, userProfile })
 
   if (loading) {
@@ -90,8 +93,21 @@ function App() {
     )
   }
 
+  // Show home page if not logged in and not explicitly showing login
+  if (!session && !showLogin) {
+    return <HomePage onGetStarted={() => setShowLogin(true)} />
+  }
+
+  // Show login page if not logged in but explicitly showing login
   if (!session) {
-    return <UnauthenticatedApp />
+    return (
+      <Stack gap="md" className="auth-container">
+        <UnauthenticatedApp />
+        <Button variant="subtle" onClick={() => setShowLogin(false)}>
+          ← Back to Home
+        </Button>
+      </Stack>
+    )
   }
 
   if (!userProfile) {
