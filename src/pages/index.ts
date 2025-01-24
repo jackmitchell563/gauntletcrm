@@ -1,0 +1,7 @@
+export { HomePage } from './HomePage'
+export { DashboardPage } from './DashboardPage'
+export { TicketsPage } from './TicketsPage'
+export { CustomersPage } from './CustomersPage'
+export { ReportsPage } from './ReportsPage'
+export { KnowledgeBasePage } from './KnowledgeBasePage'
+export { SettingsPage } from './SettingsPage' 

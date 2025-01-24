@@ -22,6 +22,10 @@ export interface Ticket {
   updated_at: string
 }
 
+export interface TicketWithTags extends Ticket {
+  ticket_tags: { tag: string }[]
+}
+
 export interface TicketTag {
   ticket_id: string
   tag: string
