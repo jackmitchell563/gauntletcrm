@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import { Group, Text, Checkbox, Stack, Pagination, Paper } from '@mantine/core'
+import { Group, Text, Checkbox, Stack, Pagination, Paper, Button } from '@mantine/core'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../supabaseClient'
 import { Ticket } from '../types/database.types'
@@ -12,6 +12,7 @@ import { TicketFilters } from './TicketFilters'
 import { BulkActions } from './BulkActions'
 import { TicketViews } from './TicketViews'
 import { FiltersContext } from '../components/Header'
+import { generateTicketResponse } from '../features/outreach/agents/OutreachAgent'
 
 interface SortState {
   column: keyof Ticket | null
@@ -333,14 +334,76 @@ export function TicketList() {
           currentFilters={filters}
           onViewSelect={setFilters}
         />
-        <BulkActions
-          selectedTickets={selectedTickets}
-          onActionComplete={() => {
-            setSelectedTickets([])
-            fetchTickets()
-          }}
-          disabled={loading}
-        />
+        <Group>
+          {(userProfile?.role === 'admin' || userProfile?.role === 'agent') && (
+            <Button
+              loading={loading}
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  // Get assigned tickets
+                  const { data: assignedTickets, error } = await supabase
+                    .from('tickets')
+                    .select(`
+                      id,
+                      title,
+                      description,
+                      created_by,
+                      status,
+                      priority
+                    `)
+                    .eq('assigned_to', user?.id)
+                    .not('status', 'in', '("resolved","closed")');
+                  
+                  if (error) throw error;
+                  
+                  // For each ticket, generate and create a response
+                  for (const ticket of assignedTickets || []) {
+                    // Get customer name
+                    const { data: customerData } = await supabase
+                      .from('user_profiles')
+                      .select('full_name')
+                      .eq('id', ticket.created_by)
+                      .single();
+
+                    const draftResponse = await generateTicketResponse(
+                      ticket,
+                      customerData?.full_name || 'Valued Customer',
+                      userProfile?.full_name || 'Support Agent'
+                    );
+                    
+                    await supabase
+                      .from('ticket_drafts')
+                      .upsert({
+                        ticket_id: ticket.id,
+                        user_id: user?.id,
+                        content: draftResponse
+                      }, {
+                        onConflict: 'ticket_id,user_id'
+                      });
+                  }
+                  
+                  // Refresh tickets to show new comments
+                  fetchTickets();
+                } catch (err) {
+                  console.error('Error generating responses:', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              Generate AI Responses
+            </Button>
+          )}
+          <BulkActions
+            selectedTickets={selectedTickets}
+            onActionComplete={() => {
+              setSelectedTickets([])
+              fetchTickets()
+            }}
+            disabled={loading}
+          />
+        </Group>
       </Group>
 
       <TicketFilters

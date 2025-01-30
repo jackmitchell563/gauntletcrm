@@ -7,6 +7,7 @@ import { FilterState } from '../types/filters'
 import { FilterContext } from '../tickets/TicketList'
 import { TabContext } from '../pages/TicketsPage'
 import { FiltersContext } from './Header'
+import { ChatBar } from './chat/ChatBar'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -49,6 +50,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <AppShell.Main>
               <Box p="md">
                 {children}
+                <ChatBar />
               </Box>
             </AppShell.Main>
           </AppShell>

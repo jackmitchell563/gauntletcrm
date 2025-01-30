@@ -28,9 +28,14 @@ export function Header({ opened, toggle, onExpandedChange }: HeaderProps) {
   const navigate = useNavigate()
   const { setActiveTab } = useContext(TabContext)
 
-  // Get current path segment
+  // Get current path segment and format it
   const currentPath = location.pathname.split('/').filter(Boolean)[0]
-  const currentSection = currentPath ? currentPath.charAt(0).toUpperCase() + currentPath.slice(1) : ''
+  const currentSection = currentPath ? 
+    currentPath
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') 
+    : ''
 
   const handleFilterClick = () => {
     if (location.pathname !== '/tickets') {

@@ -14,7 +14,8 @@ import {
   CustomersPage,
   ReportsPage,
   KnowledgeBasePage,
-  SettingsPage
+  SettingsPage,
+  AgentHistoryPage
 } from './pages'
 import '@mantine/core/styles.css'
 import './App.css'
@@ -44,7 +45,8 @@ function AuthenticatedApp() {
         <Route path="/tickets" element={<TicketsPage />} />
         {isAgent && <Route path="/customers" element={<CustomersPage />} />}
         {isAgent && <Route path="/reports" element={<ReportsPage />} />}
-        <Route path="/knowledge" element={<KnowledgeBasePage />} />
+        <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+        {isAgent && <Route path="/agent-history" element={<AgentHistoryPage />} />}
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/tickets" replace />} />
       </Routes>

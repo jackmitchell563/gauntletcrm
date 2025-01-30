@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Stack, Group, Button, Text, Paper, Box, Rating } from '@mantine/core'
 import { RichTextEditor, Link } from '@mantine/tiptap'
 import { useEditor } from '@tiptap/react'
@@ -11,6 +11,7 @@ import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../supabaseClient'
 import { StatusBadge } from '../components/StatusBadge'
 import { PriorityBadge } from '../components/PriorityBadge'
+import { generateTicketResponse } from '../features/outreach/agents/OutreachAgent'
 
 function AngleBracket() {
   return (
@@ -85,6 +86,22 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
   const isClosedOrResolved = ticket.status === 'resolved' || ticket.status === 'closed'
   const canComment = isAgent || !isClosedOrResolved
   const showRating = isCustomer && isClosedOrResolved
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [draftSaving, setDraftSaving] = useState(false)
+  const pendingSaveRef = useRef<NodeJS.Timeout | null>(null)
+  const lastContentRef = useRef<string>('')
+  const [initialDraft, setInitialDraft] = useState<string>('')
+
+  const savePendingDraft = async () => {
+    if (pendingSaveRef.current) {
+      clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = null;
+      // Save any pending changes
+      if (lastContentRef.current !== newComment) {
+        await saveDraft(lastContentRef.current);
+      }
+    }
+  };
 
   const editor = useEditor({
     extensions: [
@@ -103,9 +120,22 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
         placeholder: canComment ? "Type your message..." : "This ticket is closed. No new messages can be added."
       })
     ],
-    content: newComment,
+    content: initialDraft || newComment,
     onUpdate: ({ editor }) => {
-      setNewComment(editor.getHTML())
+      const content = editor.getHTML();
+      setNewComment(content);
+      lastContentRef.current = content;
+      
+      // Clear any pending save
+      if (pendingSaveRef.current) {
+        clearTimeout(pendingSaveRef.current);
+      }
+      
+      // Set new pending save
+      pendingSaveRef.current = setTimeout(() => {
+        saveDraft(content);
+        pendingSaveRef.current = null;
+      }, 500);
     },
     editable: !(submitting || !canComment),
     editorProps: {
@@ -122,9 +152,23 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
     }
   })
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      savePendingDraft();
+    };
+  }, []);
+
+  // Update back button and any other navigation handlers
+  const handleNavigation = async (callback: () => void) => {
+    await savePendingDraft();
+    callback();
+  };
+
   useEffect(() => {
     fetchComments()
     fetchAuthor()
+    fetchDraft()
     if (ticket.assigned_to) {
       fetchAssignedAgent()
     }
@@ -132,7 +176,7 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
       fetchExistingRating()
     }
 
-    const channel = supabase
+    const commentsChannel = supabase
       .channel('ticket_comments')
       .on(
         'postgres_changes',
@@ -148,8 +192,28 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
       )
       .subscribe()
 
+    const draftsChannel = supabase
+      .channel('ticket_drafts')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ticket_drafts',
+          filter: `ticket_id=eq.${ticketId}`
+        },
+        (payload) => {
+          // Only update if it's not our own change
+          if ((payload.new as { user_id: string }).user_id !== user?.id) {
+            fetchDraft()
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
-      channel.unsubscribe()
+      commentsChannel.unsubscribe()
+      draftsChannel.unsubscribe()
     }
   }, [ticketId, showRating, ticket.assigned_to])
 
@@ -201,6 +265,74 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
       }
     } catch (err) {
       console.error('Error fetching satisfaction rating:', err)
+    }
+  }
+
+  const fetchDraft = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('ticket_drafts')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setDraftId(data.id);
+        setInitialDraft(data.content);
+        if (editor) {
+          editor.commands.setContent(data.content);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching draft:', err)
+    }
+  }
+
+  const saveDraft = async (content: string) => {
+    if (!user || draftSaving) return;
+    
+    setDraftSaving(true)
+    try {
+      // Use upsert instead of separate insert/update
+      const { data, error } = await supabase
+        .from('ticket_drafts')
+        .upsert({
+          ticket_id: ticketId,
+          user_id: user.id,
+          content,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'ticket_id,user_id'
+        })
+        .select()
+        .single()
+
+      if (error) throw error;
+      if (data) setDraftId(data.id)
+    } catch (err) {
+      console.error('Error saving draft:', err)
+    } finally {
+      setDraftSaving(false)
+    }
+  }
+
+  const deleteDraft = async () => {
+    if (!draftId) return;
+    
+    try {
+      await supabase
+        .from('ticket_drafts')
+        .delete()
+        .eq('id', draftId)
+      
+      setDraftId(null)
+    } catch (err) {
+      console.error('Error deleting draft:', err)
     }
   }
 
@@ -258,6 +390,8 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
 
     setSubmitting(true)
     try {
+      await savePendingDraft(); // Ensure any pending draft is saved first
+      
       const { error } = await supabase.functions.invoke('handle-ticket-comment', {
         body: {
           ticket_id: ticketId,
@@ -268,6 +402,7 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
 
       if (error) throw error
       
+      await deleteDraft()
       editor.commands.setContent('')
     } catch (err) {
       console.error('Error posting comment:', err)
@@ -283,7 +418,9 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
           <Button 
             variant="subtle" 
             leftSection={<AngleBracket />}
-            onClick={onBack}
+            onClick={async () => {
+              await handleNavigation(() => onBack());
+            }}
           >
             Back to Dashboard
           </Button>
@@ -405,7 +542,45 @@ export function TicketThread({ ticketId, ticket, onBack }: TicketThreadProps) {
                 } 
               }} />
             </RichTextEditor>
-            <Group justify="flex-end">
+            <Group justify="space-between">
+              {isAgent && (
+                <Button 
+                  variant="light"
+                  loading={draftSaving}
+                  onClick={async () => {
+                    try {
+                      setDraftSaving(true);
+                      const draftResponse = await generateTicketResponse(
+                        {
+                          ...ticket,
+                          id: ticketId
+                        },
+                        author?.full_name || 'Valued Customer',
+                        userProfile?.full_name || 'Support Agent'
+                      );
+                      
+                      await supabase
+                        .from('ticket_drafts')
+                        .upsert({
+                          ticket_id: ticketId,
+                          user_id: user?.id,
+                          content: draftResponse
+                        }, {
+                          onConflict: 'ticket_id,user_id'
+                        });
+
+                      // Set the editor content to the generated response
+                      editor?.commands.setContent(draftResponse);
+                    } catch (err) {
+                      console.error('Error generating response:', err);
+                    } finally {
+                      setDraftSaving(false);
+                    }
+                  }}
+                >
+                  Generate AI Response
+                </Button>
+              )}
               <Button 
                 onClick={handleSubmit}
                 loading={submitting}

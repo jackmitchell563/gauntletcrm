@@ -6,7 +6,8 @@ import {
   IconReportAnalytics, 
   IconSettings,
   IconBook,
-  IconPlus
+  IconPlus,
+  IconRobot
 } from '@tabler/icons-react'
 import { useAuth } from '../auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -47,7 +48,8 @@ export function Sidebar({ onFilterChange, filters = { status: 'all', priority: '
     { label: 'Tickets', icon: IconTicket, path: '/tickets' },
     { label: 'Customers', icon: IconUsers, path: '/customers', agentOnly: true },
     { label: 'Reports', icon: IconReportAnalytics, path: '/reports', agentOnly: true },
-    { label: 'Knowledge Base', icon: IconBook, path: '/knowledge' },
+    { label: 'Knowledge Base', icon: IconBook, path: '/knowledge-base' },
+    { label: 'AI Agent History', icon: IconRobot, path: '/agent-history', agentOnly: true },
     { label: 'Settings', icon: IconSettings, path: '/settings' }
   ]
 

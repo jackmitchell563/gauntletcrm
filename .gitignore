@@ -39,3 +39,5 @@ tempapp.jsx
 # Keep documentation
 !README.md
 !overview.md
+
+*.ipynb
