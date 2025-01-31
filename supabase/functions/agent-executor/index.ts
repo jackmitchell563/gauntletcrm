@@ -246,7 +246,12 @@ serve(async (req) => {
     const agentExecutor = new AgentExecutor({
       agent,
       tools,
-      verbose: true
+      verbose: true,
+      tags: ["agent-executor"],
+      metadata: {
+        userId: (await supabaseClient.auth.getUser()).data.user?.id
+      },
+      projectName: Deno.env.get('LANGSMITH_PROJECT') || 'gauntletcrm'
     })
     console.log("[agent-executor] Agent executor ready")
 
@@ -256,6 +261,31 @@ serve(async (req) => {
       chat_history
     })
     console.log("[agent-executor] Agent execution completed:", { result })
+
+    // Only sync if we have a runId
+    if (result.runId) {
+      // Sync the run to agent_traces
+      const { error: syncError } = await supabaseClient
+        .from('agent_traces')
+        .upsert({
+          id: result.runId,
+          user_id: (await supabaseClient.auth.getUser()).data.user?.id,
+          name: result.output,
+          start_time: new Date().toISOString(),
+          end_time: new Date().toISOString(),
+          status: 'completed',
+          inputs: { input, chat_history },
+          outputs: result
+        }, {
+          onConflict: 'id'
+        });
+
+      if (syncError) {
+        console.error("[agent-executor] Error syncing trace:", syncError);
+      }
+    } else {
+      console.log("[agent-executor] Skipping trace sync - no runId in result:", result);
+    }
 
     return new Response(
       JSON.stringify(result),

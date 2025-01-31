@@ -215,7 +215,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // For all other events, trigger a full session check
+      if (event === 'SIGNED_IN' && session) {
+        // Only update if the session or user has actually changed
+        setSession(current => {
+          if (current?.user?.id !== session.user.id) {
+            return session
+          }
+          return current
+        })
+        setUser(current => {
+          if (current?.id !== session.user.id) {
+            return session.user
+          }
+          return current
+        })
+        return
+      }
+
+      // For other events (like TOKEN_REFRESHED, PASSWORD_RECOVERY, etc)
+      // trigger a full session check
       handleAuthSession()
     })
 

@@ -49,7 +49,7 @@ export function Sidebar({ onFilterChange, filters = { status: 'all', priority: '
     { label: 'Customers', icon: IconUsers, path: '/customers', agentOnly: true },
     { label: 'Reports', icon: IconReportAnalytics, path: '/reports', agentOnly: true },
     { label: 'Knowledge Base', icon: IconBook, path: '/knowledge-base' },
-    { label: 'AI Agent History', icon: IconRobot, path: '/agent-history', agentOnly: true },
+    { label: 'AI Agent History', icon: IconRobot, path: '/agent-history' },
     { label: 'Settings', icon: IconSettings, path: '/settings' }
   ]
 

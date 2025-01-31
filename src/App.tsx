@@ -46,7 +46,7 @@ function AuthenticatedApp() {
         {isAgent && <Route path="/customers" element={<CustomersPage />} />}
         {isAgent && <Route path="/reports" element={<ReportsPage />} />}
         <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-        {isAgent && <Route path="/agent-history" element={<AgentHistoryPage />} />}
+        <Route path="/agent-history" element={<AgentHistoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/tickets" replace />} />
       </Routes>
